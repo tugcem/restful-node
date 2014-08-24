@@ -1,6 +1,8 @@
 var express = require('express');
 var app = express();
 var fs = require('fs');
+
+require('newrelic');
 var decimal = require('decimal.js', function(Decimal) {
 // Use Decimal here in local scope. No global Decimal.
 });
@@ -42,10 +44,8 @@ function chudnovsky(digits) {
 }
 
 app.get('/shoot-for-my-cpu', function(req, res) {
-	var start = Date.now();
-	var pi = chudnovsky(1000);
-	var timeTaken = Date.now() - start;
 
+	var pi = chudnovsky(1000);
 	RESULT = pi.toString();
 
 	if(RESULT) {
@@ -55,12 +55,19 @@ app.get('/shoot-for-my-cpu', function(req, res) {
 		STATUS_CODE = 0
 		STATUS_MESSAGE = "Something went wrong"
 	}
-    res.send([{"status": [STATUS_CODE],"msg": [STATUS_MESSAGE], "result": [RESULT]}]);
+    res.send([{"status": [STATUS_CODE],"msg": [STATUS_MESSAGE]}]);
 });
 
 app.get('/shoot-for-my-disk', function(req, res) {
 
-	fs.writeFile('userLog.txt', '[USER_IP_ADDRESS]::[TIMESTAMP]::[RANDOM_STRING]', function (err) {
+    USER_IP_ADDRESS = req.ip;
+    TIMESTAMP = Date.now();
+
+    for(var RANDOM_STRING = ''; RANDOM_STRING.length < 255;) {
+        RANDOM_STRING += Math.random().toString(36).substr(2, 1)
+    }
+
+	fs.writeFile('userLog.txt', '[' + USER_IP_ADDRESS+ ']::[' + TIMESTAMP+ ']::['+ RANDOM_STRING + ']', function (err) {
 	  if(err) {
 	   STATUS_CODE = 0
 	   STATUS_MESSAGE = err.toString();
