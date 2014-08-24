@@ -1,7 +1,7 @@
 var express = require('express');
 var app = express();
 var fs = require('fs');
-
+var async = require('async');
 require('newrelic');
 var decimal = require('decimal.js', function(Decimal) {
 // Use Decimal here in local scope. No global Decimal.
@@ -45,40 +45,77 @@ function chudnovsky(digits) {
 
 app.get('/shoot-for-my-cpu', function(req, res) {
 
-	var pi = chudnovsky(1000);
-	RESULT = pi.toString();
-
-	if(RESULT) {
-		STATUS_CODE = 1
-		STATUS_MESSAGE = ""
-	} else {
-		STATUS_CODE = 0
-		STATUS_MESSAGE = "Something went wrong"
-	}
-    res.send([{"status": [STATUS_CODE],"msg": [STATUS_MESSAGE]}]);
+    async.waterfall([function(callback) {
+        result = chudnovsky(1000);
+        callback(null, result);
+    }, function(arg1, callback) {
+        if(arg1) {
+            STATUS_CODE = 1
+            STATUS_MESSAGE = ""
+        } else {
+            STATUS_CODE = 0
+            STATUS_MESSAGE = "Something went wrong"
+        }
+        json = {"status": [STATUS_CODE], "msg": [STATUS_MESSAGE]};
+        callback(null, json);
+    }, function (arg1, callback) {
+        res.send([arg1]);
+    }], function(err, result){
+    
+    });
 });
 
 app.get('/shoot-for-my-disk', function(req, res) {
-
-    USER_IP_ADDRESS = req.ip;
-    TIMESTAMP = Date.now();
-
-    for(var RANDOM_STRING = ''; RANDOM_STRING.length < 255;) {
-        RANDOM_STRING += Math.random().toString(36).substr(2, 1)
-    }
-
-	fs.writeFile('userLog.txt', '[' + USER_IP_ADDRESS+ ']::[' + TIMESTAMP+ ']::['+ RANDOM_STRING + ']', function (err) {
-	  if(err) {
-	   STATUS_CODE = 0
-	   STATUS_MESSAGE = err.toString();
-		} else {
-		STATUS_CODE = 1
-	   STATUS_MESSAGE = "";
-		}
-		res.send([{"status": [STATUS_CODE],"msg": [STATUS_MESSAGE]}]);	
-	});
-	
+    async.parallel([
+        function(callback) {
+            buffer = '[' + req.ip +']::';
+            callback(null, buffer);
+        }, function (callback) {
+            buffer = '[' + Date.now + ']::';
+            callback(null, buffer);
+        }, function(callback) {
+            for(var RANDOM_STRING = ''; RANDOM_STRING.length < 255;) {
+                RANDOM_STRING += Math.random().toString(36).substr(2, 1)
+            }
+            buffer = '[' + RANDOM_STRING + ']';
+            callback(null,buffer);
+        }], function(err, results) {
+            async.series([
+                function(callback){
+                   fs.writeFile('userLog.txt', JSON.stringify(results), function (err) {
+                        if(err) {
+                            STATUS_CODE = 0
+                            STATUS_MESSAGE = "Something went wrong";
+                        } else {
+                            STATUS_CODE = 1
+                            STATUS_MESSAGE = "";
+                        }
+                        json = {"status": [STATUS_CODE], "msg": [STATUS_MESSAGE]};
+                        res.send([json]);
+                    });
+                }
+            ]);
+    });
 });
+
+ //    USER_IP_ADDRESS = req.ip;
+ //    TIMESTAMP = Date.now();
+
+ //    for(var RANDOM_STRING = ''; RANDOM_STRING.length < 255;) {
+ //        RANDOM_STRING += Math.random().toString(36).substr(2, 1)
+ //    }
+
+// 	fs.writeFile('userLog.txt', '[' + USER_IP_ADDRESS+ ']::[' + TIMESTAMP+ ']::['+ RANDOM_STRING + ']', function (err) {
+// 	  if(err) {
+//     	   STATUS_CODE = 0
+//     	   STATUS_MESSAGE = err.toString();
+// 	   } else {
+//     	   STATUS_CODE = 1
+//     	   STATUS_MESSAGE = "";
+// 		}
+// 		res.send([{"status": [STATUS_CODE],"msg": [STATUS_MESSAGE]}]);	
+// 	});
+// });
  
 app.listen(3000);
 console.log('Listening on port 3000...');
